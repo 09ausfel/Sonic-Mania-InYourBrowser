@@ -1,4 +1,4 @@
-<-- crunch arcade on top not rlly tho but he did this and nobody else did so haha -->
+<!-- crunch arcade on top not rlly tho but he did this and nobody else did so haha -->
 
 <!doctype html>
 <html lang="en-us">
@@ -243,6 +243,12 @@
         var fullscreenButton = document.getElementById('fullscreen-button');
         var canvas = document.getElementById('canvas');
         var totalSizeMB = 198.8;
+        var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        var isSlowConnection = !!(connection && (connection.saveData || /2g|slow-2g/.test(connection.effectiveType || '')));
+
+        if (isSlowConnection) {
+            loadingText.textContent = 'slow connection detected';
+        }
 
         var links = [
             "crunch arcade on top",
@@ -354,7 +360,12 @@
                     loadingBar.style.width = percent + '%';
                     mbText.textContent = currentMB + 'MB of ' + totalSizeMB.toFixed(1) + 'MB';
 
-                    if (percent < 20) loadingText.textContent = "getting jsdlivr stuff";
+                    if (isSlowConnection) {
+                        if (percent < 30) loadingText.textContent = 'slow connection active';
+                        else if (percent < 60) loadingText.textContent = 'streaming game data';
+                        else if (percent < 90) loadingText.textContent = 'assembling assets';
+                        else loadingText.textContent = 'almost there...';
+                    } else if (percent < 20) loadingText.textContent = "getting jsdlivr stuff";
                     else if (percent < 60) loadingText.textContent = "downloading game data...";
                     else if (percent < 90) loadingText.textContent = "assembling Data.rsdk...";
                     else loadingText.textContent = "almost there...";
@@ -366,11 +377,14 @@
                         loadingBar.style.width = p + '%';
                         var currentMB = (p / 100 * totalSizeMB).toFixed(1);
                         mbText.textContent = currentMB + 'MB of ' + totalSizeMB.toFixed(1) + 'MB';
-                        loadingText.textContent = text;
+                        loadingText.textContent = isSlowConnection ? 'streaming game data carefully' : text;
                     }
                 } else if (text === 'Assembling Data.data...') {
                     loadingBar.style.width = '65%';
-                    loadingText.textContent = "combining stuff";
+                    loadingText.textContent = isSlowConnection ? 'finalizing game data' : 'combining stuff';
+                } else if (text.indexOf('Slow connection detected') !== -1) {
+                    loadingBar.style.width = '10%';
+                    loadingText.textContent = 'slow connection detected';
                 }
             },
             totalDependencies: 0,

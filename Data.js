@@ -24,32 +24,16 @@ Module['expectedDataFileDownloads']++;
 
       Module['setStatus'] && Module['setStatus'](`Downloading part ${partIndex + 1}/${NUM_PARTS}...`);
 
-      var response;
       try {
-        response = await fetch(url);
+        var response = await fetch(url, { cache: 'force-cache' });
+        if (!response.ok) {
+          throw new Error(`${response.status}: ${response.url}`);
+        }
+
+        return new Uint8Array(await response.arrayBuffer());
       } catch (e) {
         throw new Error(`Network Error: ${url}`, { cause: e });
       }
-      if (!response.ok) {
-        throw new Error(`${response.status}: ${response.url}`);
-      }
-
-      const chunks = [];
-      const reader = response.body.getReader();
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-
-      const totalLength = chunks.reduce((a, c) => a + c.length, 0);
-      const result = new Uint8Array(totalLength);
-      let offset = 0;
-      for (const chunk of chunks) {
-        result.set(chunk, offset);
-        offset += chunk.length;
-      }
-      return result;
     }
 
     async function fetchAndAssemble() {

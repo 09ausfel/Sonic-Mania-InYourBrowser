@@ -7,6 +7,9 @@ Module['expectedDataFileDownloads']++;
   var isWasmWorker = typeof ENVIRONMENT_IS_WASM_WORKER != 'undefined' && ENVIRONMENT_IS_WASM_WORKER;
   if (isPthread || isWasmWorker) return;
   var isNode = globalThis.process && globalThis.process.versions && globalThis.process.versions.node && globalThis.process.type != 'renderer';
+  var connection = globalThis.navigator && (globalThis.navigator.connection || globalThis.navigator.mozConnection || globalThis.navigator.webkitConnection);
+  var isSlowConnection = !!(connection && (connection.saveData || /2g|slow-2g/.test(connection.effectiveType || '')));
+  var MAX_CONCURRENT = isSlowConnection ? 1 : 2;
 
   async function loadPackage(metadata) {
     var PACKAGE_NAME = 'Data.data';
@@ -25,7 +28,12 @@ Module['expectedDataFileDownloads']++;
       Module['setStatus'] && Module['setStatus'](`Downloading part ${partIndex + 1}/${NUM_PARTS}...`);
 
       try {
-        var response = await fetch(url, { cache: 'force-cache' });
+        var response = await fetch(url, {
+          cache: 'force-cache',
+          headers: {
+            'Cache-Control': 'max-age=31536000, immutable'
+          }
+        });
         if (!response.ok) {
           throw new Error(`${response.status}: ${response.url}`);
         }
@@ -37,11 +45,25 @@ Module['expectedDataFileDownloads']++;
     }
 
     async function fetchAndAssemble() {
-      const partPromises = [];
-      for (let i = 0; i < NUM_PARTS; i++) {
-        partPromises.push(fetchPart(i));
+      const parts = [];
+      const totalBatches = Math.ceil(NUM_PARTS / MAX_CONCURRENT);
+
+      if (isSlowConnection) {
+        Module['setStatus'] && Module['setStatus']('Slow connection detected — using low-bandwidth download mode...');
       }
-      const parts = await Promise.all(partPromises);
+
+      for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const batchStart = batchIndex * MAX_CONCURRENT;
+        const batchEnd = Math.min(batchStart + MAX_CONCURRENT, NUM_PARTS);
+        const batch = [];
+
+        for (let i = batchStart; i < batchEnd; i++) {
+          batch.push(fetchPart(i));
+        }
+
+        const batchResults = await Promise.all(batch);
+        parts.push(...batchResults);
+      }
 
       const totalSize = parts.reduce((a, p) => a + p.length, 0);
       const assembled = new Uint8Array(totalSize);
